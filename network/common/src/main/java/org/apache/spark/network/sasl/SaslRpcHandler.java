@@ -19,8 +19,14 @@ package org.apache.spark.network.sasl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import javax.crypto.KeyGenerator;
 import javax.security.sasl.Sasl;
 
+import com.google.common.base.Throwables;
+import com.intel.chimera.cipher.CipherTransformation;
+import com.intel.chimera.conf.ConfigurationKeys;
+import com.intel.chimera.random.JavaSecureRandom;
+import com.intel.chimera.random.SecureRandomFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -33,6 +39,8 @@ import org.apache.spark.network.server.RpcHandler;
 import org.apache.spark.network.server.StreamManager;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.TransportConf;
+
+import java.util.Properties;
 
 /**
  * RPC Handler which performs SASL authentication before delegating to a child RPC handler.
@@ -59,6 +67,7 @@ class SaslRpcHandler extends RpcHandler {
 
   private SparkSaslServer saslServer;
   private boolean isComplete;
+  private boolean isEnablingAes;
 
   SaslRpcHandler(
       TransportConf conf,
@@ -71,6 +80,7 @@ class SaslRpcHandler extends RpcHandler {
     this.secretKeyHolder = secretKeyHolder;
     this.saslServer = null;
     this.isComplete = false;
+    this.isEnablingAes = false;
   }
 
   @Override
@@ -81,29 +91,32 @@ class SaslRpcHandler extends RpcHandler {
       return;
     }
 
-    ByteBuf nettyBuf = Unpooled.wrappedBuffer(message);
-    SaslMessage saslMessage;
-    try {
-      saslMessage = SaslMessage.decode(nettyBuf);
-    } finally {
-      nettyBuf.release();
-    }
+    if (saslServer == null || !saslServer.isComplete()) {
+      // Sasl authentication procedure
+      ByteBuf nettyBuf = Unpooled.wrappedBuffer(message);
+      SaslMessage saslMessage;
+      try {
+        saslMessage = SaslMessage.decode(nettyBuf);
+      } finally {
+        nettyBuf.release();
+      }
 
-    if (saslServer == null) {
-      // First message in the handshake, setup the necessary state.
-      client.setClientId(saslMessage.appId);
-      saslServer = new SparkSaslServer(saslMessage.appId, secretKeyHolder,
-        conf.saslServerAlwaysEncrypt());
-    }
+      if (saslServer == null) {
+        // First message in the handshake, setup the necessary state.
+        client.setClientId(saslMessage.appId);
+        saslServer = new SparkSaslServer(saslMessage.appId, secretKeyHolder,
+            conf.saslServerAlwaysEncrypt());
+      }
 
-    byte[] response;
-    try {
-      response = saslServer.response(JavaUtils.bufferToArray(
-        saslMessage.body().nioByteBuffer()));
-    } catch (IOException ioe) {
-      throw new RuntimeException(ioe);
+      byte[] response;
+      try {
+        response = saslServer.response(JavaUtils.bufferToArray(
+            saslMessage.body().nioByteBuffer()));
+      } catch (IOException ioe) {
+        throw new RuntimeException(ioe);
+      }
+      callback.onSuccess(ByteBuffer.wrap(response));
     }
-    callback.onSuccess(ByteBuffer.wrap(response));
 
     // Setup encryption after the SASL response is sent, otherwise the client can't parse the
     // response. It's ok to change the channel pipeline here since we are processing an incoming
@@ -111,16 +124,27 @@ class SaslRpcHandler extends RpcHandler {
     // method returns. This assumes that the code ensures, through other means, that no outbound
     // messages are being written to the channel while negotiation is still going on.
     if (saslServer.isComplete()) {
-      logger.debug("SASL authentication successful for channel {}", client);
-      isComplete = true;
       if (SparkSaslServer.QOP_AUTH_CONF.equals(saslServer.getNegotiatedProperty(Sasl.QOP))) {
+        if (conf.saslEncryptionAesEnabled()) {
+          // negotiate AES if configured
+          if (isEnablingAes) {
+            negotiateAes(message, callback);
+          } else {
+            isEnablingAes = true;
+            // return from here to wait for next RPC from client
+            return;
+          }
+        }
+        logger.debug("SASL authentication successful for channel {}", client);
         logger.debug("Enabling encryption for channel {}", client);
         SaslEncryption.addToChannel(channel, saslServer, conf.maxSaslEncryptedBlockSize());
         saslServer = null;
       } else {
+        logger.debug("SASL authentication successful for channel {}", client);
         saslServer.dispose();
         saslServer = null;
       }
+      isComplete = true;
     }
   }
 
@@ -155,4 +179,47 @@ class SaslRpcHandler extends RpcHandler {
     delegate.exceptionCaught(cause, client);
   }
 
+  /**
+   * Negotiates AES based on conplete {@link SparkSaslServer}. The keys need to be encrypted by
+   * sasl server.
+   */
+  private void negotiateAes(ByteBuffer message, RpcResponseCallback callback) {
+    // receive initial option from client
+    CipherOption cipherOption = CipherOption.decode(Unpooled.wrappedBuffer(message));
+    CipherTransformation transformation = CipherTransformation.fromName(cipherOption.cipherSuite);
+    Properties properties = new Properties();
+    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
+        JavaSecureRandom.class.getName());
+
+    try {
+      // generate key and iv
+      int keyLen = conf.saslEncryptionAesCipherKeySizeBits();
+      KeyGenerator keyGenerator = KeyGenerator.getInstance("HmacSHA1");
+      keyGenerator.init(keyLen);
+
+      byte[] inKey = keyGenerator.generateKey().getEncoded();
+      byte[] outKey = keyGenerator.generateKey().getEncoded();
+
+      byte[] inIv = new byte[transformation.getAlgorithmBlockSize()];
+      byte[] outIv = new byte[transformation.getAlgorithmBlockSize()];
+      SecureRandomFactory.getSecureRandom(properties).nextBytes(inIv);
+      SecureRandomFactory.getSecureRandom(properties).nextBytes(outIv);
+
+      // create new option for client. The key is encrypted
+      cipherOption = new CipherOption(cipherOption.cipherSuite,
+          saslServer.wrap(inKey, 0, inKey.length), inIv,
+          saslServer.wrap(outKey, 0, outKey.length), outIv);
+
+      // enable AES on saslServer
+      saslServer.enableAes(transformation, properties, inKey, outKey, inIv, outIv);
+
+      // send cipher option to client
+      ByteBuf buf = Unpooled.buffer(cipherOption.encodedLength());
+      cipherOption.encode(buf);
+      callback.onSuccess(buf.nioBuffer());
+    } catch (Exception e) {
+      logger.error("AES negotiation exception: ", e);
+      throw Throwables.propagate(e);
+    }
+  }
 }

@@ -29,11 +29,13 @@ import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Properties;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
+import com.intel.chimera.cipher.CipherTransformation;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.base64.Base64;
 import org.slf4j.Logger;
@@ -73,6 +75,9 @@ public class SparkSaslServer implements SaslEncryptionBackend {
   private final String secretKeyId;
   private final SecretKeyHolder secretKeyHolder;
   private SaslServer saslServer;
+
+  private boolean isAesEnabled;
+  private SparkSaslAES aesCipher;
 
   public SparkSaslServer(
       String secretKeyId,
@@ -139,14 +144,28 @@ public class SparkSaslServer implements SaslEncryptionBackend {
     }
   }
 
+  public void enableAes(CipherTransformation cipherTransformation, Properties properties, byte[] inKey,
+      byte[] outKey, byte[] inIv, byte[] outIv) throws IOException {
+    aesCipher = new SparkSaslAES(cipherTransformation, properties, inKey, outKey, inIv, outIv);
+    isAesEnabled = true;
+  }
+
   @Override
   public byte[] wrap(byte[] data, int offset, int len) throws SaslException {
-    return saslServer.wrap(data, offset, len);
+    if (isAesEnabled) {
+      return aesCipher.wrap(data, offset, len);
+    } else {
+      return saslServer.wrap(data, offset, len);
+    }
   }
 
   @Override
   public byte[] unwrap(byte[] data, int offset, int len) throws SaslException {
-    return saslServer.unwrap(data, offset, len);
+    if (isAesEnabled) {
+      return aesCipher.unwrap(data, offset, len);
+    } else {
+      return saslServer.unwrap(data, offset, len);
+    }
   }
 
   /**
