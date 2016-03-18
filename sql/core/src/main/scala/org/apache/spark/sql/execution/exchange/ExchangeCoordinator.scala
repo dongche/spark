@@ -22,7 +22,8 @@ import javax.annotation.concurrent.GuardedBy
 
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.{Logging, MapOutputStatistics, ShuffleDependency, SimpleFutureAction}
+import org.apache.spark.{MapOutputStatistics, ShuffleDependency, SimpleFutureAction}
+import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.{ShuffledRowRDD, SparkPlan}
@@ -55,7 +56,7 @@ import org.apache.spark.sql.execution.{ShuffledRowRDD, SparkPlan}
  *    If this coordinator has made the decision on how to shuffle data, this [[ShuffleExchange]]
  *    will immediately get its corresponding post-shuffle [[ShuffledRowRDD]].
  *  - If this coordinator has not made the decision on how to shuffle data, it will ask those
- *    registered [[ShuffleExchange]]s to submit their pre-shuffle stages. Then, based on the the
+ *    registered [[ShuffleExchange]]s to submit their pre-shuffle stages. Then, based on the
  *    size statistics of pre-shuffle partitions, this coordinator will determine the number of
  *    post-shuffle partitions and pack multiple pre-shuffle partitions with continuous indices
  *    to a single post-shuffle partition whenever necessary.

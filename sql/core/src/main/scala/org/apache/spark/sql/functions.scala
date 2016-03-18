@@ -22,35 +22,17 @@ import scala.reflect.runtime.universe.{typeTag, TypeTag}
 import scala.util.Try
 
 import org.apache.spark.annotation.Experimental
-import org.apache.spark.sql.catalyst.{CatalystQl, ScalaReflection}
+import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.analysis.{Star, UnresolvedFunction}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.parser.CatalystQl
 import org.apache.spark.sql.catalyst.plans.logical.BroadcastHint
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
-/**
- * Ensures that java functions signatures for methods that now return a [[TypedColumn]] still have
- * legacy equivalents in bytecode.  This compatibility is done by forcing the compiler to generate
- * "bridge" methods due to the use of covariant return types.
- *
- * {{{
- *   // In LegacyFunctions:
- *   public abstract org.apache.spark.sql.Column avg(java.lang.String);
- *
- *   // In functions:
- *   public static org.apache.spark.sql.TypedColumn<java.lang.Object, java.lang.Object> avg(...);
- * }}}
- *
- * This allows us to use the same functions both in typed [[Dataset]] operations and untyped
- * [[DataFrame]] operations when the return type for a given function is statically known.
- */
-private[sql] abstract class LegacyFunctions {
-  def count(columnName: String): Column
-}
 
 /**
  * :: Experimental ::
@@ -71,7 +53,7 @@ private[sql] abstract class LegacyFunctions {
  */
 @Experimental
 // scalastyle:off
-object functions extends LegacyFunctions {
+object functions {
 // scalastyle:on
 
   private def withExpr(expr: Expression): Column = Column(expr)
@@ -286,7 +268,7 @@ object functions extends LegacyFunctions {
    * @since 1.3.0
    */
   def count(columnName: String): TypedColumn[Any, Long] =
-    count(Column(columnName)).as(ExpressionEncoder[Long])
+    count(Column(columnName)).as(ExpressionEncoder[Long]())
 
   /**
    * Aggregate function: returns the number of distinct items in a group.
@@ -935,7 +917,7 @@ object functions extends LegacyFunctions {
    * @since 1.5.0
    */
   def broadcast(df: DataFrame): DataFrame = {
-    DataFrame(df.sqlContext, BroadcastHint(df.logicalPlan))
+    Dataset.newDataFrame(df.sqlContext, BroadcastHint(df.logicalPlan))
   }
 
   /**
@@ -1179,7 +1161,7 @@ object functions extends LegacyFunctions {
    * @group normal_funcs
    */
   def expr(expr: String): Column = {
-    val parser = SQLContext.getActive().map(_.sqlParser).getOrElse(new CatalystQl())
+    val parser = SQLContext.getActive().map(_.sessionState.sqlParser).getOrElse(new CatalystQl())
     Column(parser.parseExpression(expr))
   }
 
@@ -1782,7 +1764,7 @@ object functions extends LegacyFunctions {
   def round(e: Column, scale: Int): Column = withExpr { Round(e.expr, Literal(scale)) }
 
   /**
-   * Shift the the given value numBits left. If the given value is a long value, this function
+   * Shift the given value numBits left. If the given value is a long value, this function
    * will return a long value else it will return an integer value.
    *
    * @group math_funcs
@@ -1791,7 +1773,7 @@ object functions extends LegacyFunctions {
   def shiftLeft(e: Column, numBits: Int): Column = withExpr { ShiftLeft(e.expr, lit(numBits).expr) }
 
   /**
-   * Shift the the given value numBits right. If the given value is a long value, it will return
+   * Shift the given value numBits right. If the given value is a long value, it will return
    * a long value else it will return an integer value.
    *
    * @group math_funcs
@@ -1802,7 +1784,7 @@ object functions extends LegacyFunctions {
   }
 
   /**
-   * Unsigned shift the the given value numBits right. If the given value is a long value,
+   * Unsigned shift the given value numBits right. If the given value is a long value,
    * it will return a long value else it will return an integer value.
    *
    * @group math_funcs
@@ -1972,7 +1954,7 @@ object functions extends LegacyFunctions {
   def crc32(e: Column): Column = withExpr { Crc32(e.expr) }
 
   /**
-   * Calculates the hash code of given columns, and returns the result as a int column.
+   * Calculates the hash code of given columns, and returns the result as an int column.
    *
    * @group misc_funcs
    * @since 2.0
