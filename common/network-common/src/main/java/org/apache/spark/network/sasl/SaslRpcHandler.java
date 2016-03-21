@@ -26,6 +26,7 @@ import com.google.common.base.Throwables;
 import com.intel.chimera.cipher.CipherTransformation;
 import com.intel.chimera.conf.ConfigurationKeys;
 import com.intel.chimera.random.JavaSecureRandom;
+import com.intel.chimera.random.SecureRandom;
 import com.intel.chimera.random.SecureRandomFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -67,7 +68,7 @@ class SaslRpcHandler extends RpcHandler {
 
   private SparkSaslServer saslServer;
   private boolean isComplete;
-  private boolean isEnablingAes;
+  private boolean isNegotiatingAes;
 
   SaslRpcHandler(
       TransportConf conf,
@@ -80,7 +81,7 @@ class SaslRpcHandler extends RpcHandler {
     this.secretKeyHolder = secretKeyHolder;
     this.saslServer = null;
     this.isComplete = false;
-    this.isEnablingAes = false;
+    this.isNegotiatingAes = false;
   }
 
   @Override
@@ -127,10 +128,10 @@ class SaslRpcHandler extends RpcHandler {
       if (SparkSaslServer.QOP_AUTH_CONF.equals(saslServer.getNegotiatedProperty(Sasl.QOP))) {
         if (conf.saslEncryptionAesEnabled()) {
           // negotiate AES if configured
-          if (isEnablingAes) {
+          if (isNegotiatingAes) {
             negotiateAes(message, callback);
           } else {
-            isEnablingAes = true;
+            isNegotiatingAes = true;
             // return from here to wait for next RPC from client
             return;
           }
@@ -180,7 +181,7 @@ class SaslRpcHandler extends RpcHandler {
   }
 
   /**
-   * Negotiates AES based on conplete {@link SparkSaslServer}. The keys need to be encrypted by
+   * Negotiates AES based on complete {@link SparkSaslServer}. The keys need to be encrypted by
    * sasl server.
    */
   private void negotiateAes(ByteBuffer message, RpcResponseCallback callback) {
@@ -202,8 +203,9 @@ class SaslRpcHandler extends RpcHandler {
 
       byte[] inIv = new byte[transformation.getAlgorithmBlockSize()];
       byte[] outIv = new byte[transformation.getAlgorithmBlockSize()];
-      SecureRandomFactory.getSecureRandom(properties).nextBytes(inIv);
-      SecureRandomFactory.getSecureRandom(properties).nextBytes(outIv);
+      SecureRandom secureRandom = SecureRandomFactory.getSecureRandom(properties);
+      secureRandom.nextBytes(inIv);
+      secureRandom.nextBytes(outIv);
 
       // create new option for client. The key is encrypted
       cipherOption = new CipherOption(cipherOption.cipherSuite,

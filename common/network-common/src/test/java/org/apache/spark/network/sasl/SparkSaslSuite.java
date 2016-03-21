@@ -68,6 +68,11 @@ import org.apache.spark.network.util.TransportConf;
  */
 public class SparkSaslSuite {
 
+  private static final String BLOCK_SIZE_CONF = "spark.network.sasl.maxEncryptedBlockSize";
+  private static final String AES_ENABLED_CONF = "spark.network.sasl.encryption.aes.enabled";
+  private static final String AES_MODE_CONF =
+      "spark.network.sasl.encryption.aes.cipher.transformation";
+
   /** Provides a secret key holder which returns secret key == appId */
   private SecretKeyHolder secretKeyHolder = new SecretKeyHolder() {
     @Override
@@ -382,18 +387,15 @@ public class SparkSaslSuite {
         CipherTransformation.AES_CTR_NOPADDING
     };
     for (CipherTransformation transformation : transformations) {
-      final String blockSizeConf = "spark.network.sasl.maxEncryptedBlockSize";
-      System.setProperty(blockSizeConf, "10k");
-      final String aesEnabled = "spark.network.sasl.encryption.aes.enabled";
-      System.setProperty(aesEnabled, "true");
-      final String aesMode = "spark.network.sasl.encryption.aes.cipher.transformation";
-      System.setProperty(aesMode, transformation.getName());
+      System.setProperty(BLOCK_SIZE_CONF, "10k");
+      System.setProperty(AES_ENABLED_CONF, "true");
+      System.setProperty(AES_MODE_CONF, transformation.getName());
 
       final AtomicReference<ManagedBuffer> response = new AtomicReference<>();
       final File file = File.createTempFile("sasltest", ".txt");
       SaslTestCtx ctx = null;
       try {
-        final TransportConf conf = new TransportConf("shuffle", new SystemPropertyConfigProvider());
+        final TransportConf conf = new TransportConf("rpc", new SystemPropertyConfigProvider());
         StreamManager sm = mock(StreamManager.class);
         when(sm.getChunk(anyLong(), anyInt())).thenAnswer(new Answer<ManagedBuffer>() {
           @Override
@@ -444,9 +446,9 @@ public class SparkSaslSuite {
         if (response.get() != null) {
           response.get().release();
         }
-        System.clearProperty(blockSizeConf);
-        System.clearProperty(aesEnabled);
-        System.clearProperty(aesMode);
+        System.clearProperty(BLOCK_SIZE_CONF);
+        System.clearProperty(AES_ENABLED_CONF);
+        System.clearProperty(AES_MODE_CONF);
       }
     }
   }

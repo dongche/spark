@@ -50,7 +50,7 @@ public class SparkSaslAES {
     try {
       encryptor.init(Cipher.ENCRYPT_MODE, outKey, outIv);
     } catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
-      throw new IOException(e);
+      throw new IOException("Failed to initialize encryptor", e);
     }
 
     // decryptor
@@ -58,7 +58,7 @@ public class SparkSaslAES {
     try {
       decryptor.init(Cipher.DECRYPT_MODE, inKey, inIv);
     } catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
-      throw new IOException(e);
+      throw new IOException("Failed to initialize decryptor", e);
     }
 
     integrity = new Integrity(outKey, inKey);

@@ -53,7 +53,7 @@ public class SparkSaslClient implements SaslEncryptionBackend {
   private SaslClient saslClient;
 
   private boolean isAesEnabled;
-  private SparkSaslAES aesCipher;
+  private SparkSaslAES sparkSaslAES;
 
   public SparkSaslClient(String secretKeyId, SecretKeyHolder secretKeyHolder, boolean encrypt) {
     this.secretKeyId = secretKeyId;
@@ -156,14 +156,14 @@ public class SparkSaslClient implements SaslEncryptionBackend {
 
   public void enableAes(CipherTransformation cipherTransformation, Properties properties, byte[] inKey,
       byte[] outKey, byte[] inIv, byte[] outIv) throws IOException {
-    aesCipher = new SparkSaslAES(cipherTransformation, properties, inKey, outKey, inIv, outIv);
+    sparkSaslAES = new SparkSaslAES(cipherTransformation, properties, inKey, outKey, inIv, outIv);
     isAesEnabled = true;
   }
 
   @Override
   public byte[] wrap(byte[] data, int offset, int len) throws SaslException {
     if (isAesEnabled) {
-      return aesCipher.wrap(data, offset, len);
+      return sparkSaslAES.wrap(data, offset, len);
     } else {
       return saslClient.wrap(data, offset, len);
     }
@@ -172,7 +172,7 @@ public class SparkSaslClient implements SaslEncryptionBackend {
   @Override
   public byte[] unwrap(byte[] data, int offset, int len) throws SaslException {
     if (isAesEnabled) {
-      return aesCipher.unwrap(data, offset, len);
+      return sparkSaslAES.unwrap(data, offset, len);
     } else {
       return saslClient.unwrap(data, offset, len);
     }
