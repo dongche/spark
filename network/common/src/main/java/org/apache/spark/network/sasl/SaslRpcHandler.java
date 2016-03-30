@@ -136,12 +136,12 @@ class SaslRpcHandler extends RpcHandler {
             return;
           }
         }
-        logger.debug("SASL authentication successful for channel {}", client);
-        logger.debug("Enabling encryption for channel {}", client);
+        logger.info("xxxxxx: SASL authentication successful for channel {}", client);
+        logger.info("xxxxxx: Enabling encryption for channel {}", client);
         SaslEncryption.addToChannel(channel, saslServer, conf.maxSaslEncryptedBlockSize());
         saslServer = null;
       } else {
-        logger.debug("SASL authentication successful for channel {}", client);
+        logger.info("xxxxxx: SASL authentication successful for channel {}", client);
         saslServer.dispose();
         saslServer = null;
       }
@@ -214,6 +214,7 @@ class SaslRpcHandler extends RpcHandler {
       ByteBuf buf = Unpooled.buffer(cipherOption.encodedLength());
       cipherOption.encode(buf);
       callback.onSuccess(buf.nioBuffer());
+      logger.info("xxxxxx: AES enabled on server");
     } catch (Exception e) {
       logger.error("AES negotiation exception: ", e);
       throw Throwables.propagate(e);

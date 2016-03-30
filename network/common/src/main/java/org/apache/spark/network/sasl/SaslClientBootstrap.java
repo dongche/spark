@@ -138,6 +138,6 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
     saslClient.enableAes(CipherTransformation.fromName(cipherOption.cipherSuite), properties,
         inKey, outKey, cipherOption.outIv, cipherOption.inIv);
 
-    logger.debug("AES enabled for SASL encryption.");
+    logger.info("xxxxxx: AES enabled for SASL encryption on client.");
   }
 }

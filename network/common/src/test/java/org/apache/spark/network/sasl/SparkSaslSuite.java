@@ -61,12 +61,15 @@ import org.apache.spark.network.util.ByteArrayWritableChannel;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.SystemPropertyConfigProvider;
 import org.apache.spark.network.util.TransportConf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Jointly tests SparkSaslClient and SparkSaslServer, as both are black boxes.
  */
 public class SparkSaslSuite {
 
+  private static final Logger logger = LoggerFactory.getLogger(SparkSaslSuite.class);
   private static final String BLOCK_SIZE_CONF = "spark.network.sasl.maxEncryptedBlockSize";
   private static final String AES_ENABLED_CONF = "spark.network.sasl.encryption.aes.enabled";
   private static final String AES_MODE_CONF =
@@ -385,14 +388,16 @@ public class SparkSaslSuite {
 
   @Test
   public void testSaslEncryptionAes() throws Exception {
-    CipherTransformation[] transformations = new CipherTransformation[] {
-        CipherTransformation.AES_CBC_NOPADDING,
-        CipherTransformation.AES_CTR_NOPADDING
+    String[] modes = new String[] {
+        "noSaslEncryption",
+        "3DES",
+        CipherTransformation.AES_CBC_NOPADDING.getName(),
+        CipherTransformation.AES_CTR_NOPADDING.getName()
     };
-    for (CipherTransformation transformation : transformations) {
-      System.setProperty(BLOCK_SIZE_CONF, "10k");
-      System.setProperty(AES_ENABLED_CONF, "true");
-      System.setProperty(AES_MODE_CONF, transformation.getName());
+    for (String mode : modes) {
+      System.setProperty(BLOCK_SIZE_CONF, "64k");
+      System.setProperty(AES_ENABLED_CONF, mode.equals("3DES") ? "false" : "true");
+      System.setProperty(AES_MODE_CONF, mode);
 
       final AtomicReference<ManagedBuffer> response = new AtomicReference<>();
       final File file = File.createTempFile("sasltest", ".txt");
@@ -410,11 +415,11 @@ public class SparkSaslSuite {
         RpcHandler rpcHandler = mock(RpcHandler.class);
         when(rpcHandler.getStreamManager()).thenReturn(sm);
 
-        byte[] data = new byte[1 * 1024 * 1024];
+        byte[] data = new byte[512 * 1024 * 1024];
         new Random().nextBytes(data);
         Files.write(data, file);
 
-        ctx = new SaslTestCtx(rpcHandler, true, false);
+        ctx = new SaslTestCtx(rpcHandler, mode.equals("noSaslEncryption") ? false : true, false);
 
         final Object lock = new Object();
 
@@ -432,8 +437,10 @@ public class SparkSaslSuite {
         }).when(callback).onSuccess(anyInt(), any(ManagedBuffer.class));
 
         synchronized (lock) {
+          long start = System.currentTimeMillis();
           ctx.client.fetchChunk(0, 0, callback);
-          lock.wait(10 * 1000);
+          lock.wait(100 * 1000);
+          logger.debug("****** take time: {}", System.currentTimeMillis() - start);
         }
 
         verify(callback, times(1)).onSuccess(anyInt(), any(ManagedBuffer.class));

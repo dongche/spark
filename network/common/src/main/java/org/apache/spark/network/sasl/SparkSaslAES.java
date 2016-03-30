@@ -31,16 +31,23 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * AES encryption and decryption.
  */
 public class SparkSaslAES {
+  private final Logger logger = LoggerFactory.getLogger(SparkSaslAES.class);
 
   private final Cipher encryptor;
   private final Cipher decryptor;
 
   private final Integrity integrity;
+
+  private final AtomicInteger count;
 
   public SparkSaslAES(CipherTransformation cipherTransformation, Properties properties, byte[] inKey,
       byte[] outKey, byte[] inIv, byte[] outIv) throws IOException {
@@ -62,6 +69,7 @@ public class SparkSaslAES {
     }
 
     integrity = new Integrity(outKey, inKey);
+    count = new AtomicInteger(0);
   }
 
   /**
@@ -101,6 +109,7 @@ public class SparkSaslAES {
     System.arraycopy(encrypted, 0, wrapped, 0, encrypted.length);
     System.arraycopy(integrity.getSeqNum(), 0, wrapped, encrypted.length, 4);
 
+    //logger.info("xxxxxx: wrap msg - " + count.incrementAndGet());
     return wrapped;
   }
 
@@ -142,6 +151,7 @@ public class SparkSaslAES {
           (peerSeqNum) + " Expected: " + integrity.peerSeqNum);
     }
 
+    //logger.info("xxxxxx: unwrap msg - " + count.incrementAndGet());
     // return msg considering padding
     if (msgLength == msg.length) {
       return msg;
