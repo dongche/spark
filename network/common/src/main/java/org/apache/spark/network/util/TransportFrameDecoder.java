@@ -26,6 +26,9 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.apache.spark.network.server.TransportChannelHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A customized frame decoder that allows intercepting raw data.
@@ -45,6 +48,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
  */
 public class TransportFrameDecoder extends ChannelInboundHandlerAdapter {
 
+  private final Logger logger = LoggerFactory.getLogger(TransportFrameDecoder.class);
   public static final String HANDLER_NAME = "frameDecoder";
   private static final int LENGTH_SIZE = 8;
   private static final int MAX_FRAME_SIZE = Integer.MAX_VALUE;
@@ -57,8 +61,16 @@ public class TransportFrameDecoder extends ChannelInboundHandlerAdapter {
   private long nextFrameSize = UNKNOWN_FRAME_SIZE;
   private volatile Interceptor interceptor;
 
+  private boolean x = true;
+  private int c = 0;
+
   @Override
   public void channelRead(ChannelHandlerContext ctx, Object data) throws Exception {
+    if (x) {
+      //logger.debug("****** before frame decoder: {}", System.currentTimeMillis());
+      x = false;
+    }
+    c++;
     ByteBuf in = (ByteBuf) data;
     buffers.add(in);
     totalSize += in.readableBytes();
@@ -83,6 +95,10 @@ public class TransportFrameDecoder extends ChannelInboundHandlerAdapter {
         if (frame == null) {
           break;
         }
+        //logger.debug("****** after frame decoder : {}", System.currentTimeMillis());
+        //logger.debug("****** frame piece: {}", c);
+        x = true;
+        c = 0;
         ctx.fireChannelRead(frame);
       }
     }
@@ -128,6 +144,7 @@ public class TransportFrameDecoder extends ChannelInboundHandlerAdapter {
       return null;
     }
 
+    //logger.debug("***** middle frame decoder: {}", System.currentTimeMillis());
     // Reset size for next frame.
     nextFrameSize = UNKNOWN_FRAME_SIZE;
 
@@ -145,7 +162,8 @@ public class TransportFrameDecoder extends ChannelInboundHandlerAdapter {
     while (remaining > 0) {
       ByteBuf next = nextBufferForFrame(remaining);
       remaining -= next.readableBytes();
-      frame.addComponent(next).writerIndex(frame.writerIndex() + next.readableBytes());
+      frame.writeBytes(next);
+      next.release();
     }
     assert remaining == 0;
     return frame;
