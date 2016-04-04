@@ -57,6 +57,7 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
       String appId,
       SecretKeyHolder secretKeyHolder,
       boolean encrypt) {
+    logger.info("************* construct client bootstrap {} ********", encrypt);
     this.conf = conf;
     this.appId = appId;
     this.secretKeyHolder = secretKeyHolder;
@@ -70,6 +71,7 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
    */
   @Override
   public void doBootstrap(TransportClient client, Channel channel) {
+    logger.info("************** start client ***********");
     SparkSaslClient saslClient = new SparkSaslClient(appId, secretKeyHolder, encrypt);
     try {
       byte[] payload = saslClient.firstToken();
@@ -85,21 +87,23 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
       }
 
       client.setClientId(appId);
-
+      logger.info("xxxxxx: client1");
       if (encrypt) {
         if (!SparkSaslServer.QOP_AUTH_CONF.equals(saslClient.getNegotiatedProperty(Sasl.QOP))) {
           throw new RuntimeException(
             new SaslException("Encryption requests by negotiated non-encrypted connection."));
         }
 
+        logger.info("xxxxxx: client2");
         if (conf.saslEncryptionAesEnabled()) {
+          logger.info("xxxxxx: start aes negotiate on client");
           negotiateAes(client, saslClient);
         }
 
         SaslEncryption.addToChannel(channel, saslClient, conf.maxSaslEncryptedBlockSize());
         saslClient = null;
 
-        logger.debug("Channel {} configured for SASL encryption.", client);
+        logger.info("xxxxxx: Channel {} configured for SASL encryption.", client);
       }
     } catch (IOException ioe) {
       throw new RuntimeException(ioe);
@@ -126,7 +130,9 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
     cipherOption.encode(buf);
 
     // send option to server and decode received negotiated option
+    logger.info("xxxxxx: AES on client. before send");
     ByteBuffer response = client.sendRpcSync(buf.nioBuffer(), conf.saslRTTimeoutMs());
+    logger.info("xxxxxx: AES on client. after send");
     cipherOption = CipherOption.decode(Unpooled.wrappedBuffer(response));
 
     // decrypt key from option. Server's outKey is client's inKey, and vice versa.

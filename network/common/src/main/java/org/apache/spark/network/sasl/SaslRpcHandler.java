@@ -182,6 +182,7 @@ class SaslRpcHandler extends RpcHandler {
   private void negotiateAes(ByteBuffer message, RpcResponseCallback callback) {
     // receive initial option from client
     CipherOption cipherOption = CipherOption.decode(Unpooled.wrappedBuffer(message));
+    logger.info("xxxxxx: cipher in server: {}", cipherOption.cipherSuite);
     CipherTransformation transformation = CipherTransformation.fromName(cipherOption.cipherSuite);
     Properties properties = new Properties();
     properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
@@ -214,7 +215,7 @@ class SaslRpcHandler extends RpcHandler {
       ByteBuf buf = Unpooled.buffer(cipherOption.encodedLength());
       cipherOption.encode(buf);
       callback.onSuccess(buf.nioBuffer());
-      logger.info("xxxxxx: AES enabled on server");
+      logger.info("xxxxxx: AES enabled on server : {}", transformation.getName());
     } catch (Exception e) {
       logger.error("AES negotiation exception: ", e);
       throw Throwables.propagate(e);

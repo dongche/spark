@@ -162,7 +162,9 @@ public class SparkSaslClient implements SaslEncryptionBackend {
 
   @Override
   public byte[] wrap(byte[] data, int offset, int len) throws SaslException {
+    logger.info("********* client wrap");
     if (isAesEnabled) {
+      logger.info("********* client wrap aes");
       return sparkSaslAES.wrap(data, offset, len);
     } else {
       return saslClient.wrap(data, offset, len);
@@ -171,7 +173,9 @@ public class SparkSaslClient implements SaslEncryptionBackend {
 
   @Override
   public byte[] unwrap(byte[] data, int offset, int len) throws SaslException {
+    logger.info("********* client unwrap");
     if (isAesEnabled) {
+      logger.info("********* client unwrap aes");
       return sparkSaslAES.unwrap(data, offset, len);
     } else {
       return saslClient.unwrap(data, offset, len);
