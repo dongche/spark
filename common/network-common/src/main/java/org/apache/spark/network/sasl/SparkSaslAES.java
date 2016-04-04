@@ -36,6 +36,7 @@ import java.util.Properties;
  * AES encryption and decryption.
  */
 public class SparkSaslAES {
+  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
   private final Cipher encryptor;
   private final Cipher decryptor;
@@ -75,6 +76,7 @@ public class SparkSaslAES {
   public byte[] wrap(byte[] data, int offset, int len) throws SaslException {
     // mac
     byte[] mac = integrity.getHMAC(data, offset, len);
+    integrity.incMySeqNum();
 
     // padding based on cipher
     byte[] padding;
@@ -86,7 +88,7 @@ public class SparkSaslAES {
         padding[i] = (byte) pad;
       }
     } else {
-      padding = new byte[0];
+      padding = EMPTY_BYTE_ARRAY;
     }
 
     // encrypt
@@ -141,6 +143,7 @@ public class SparkSaslAES {
       throw new SaslException("Out of order sequencing of messages. Got: " + integrity.byteToInt
           (peerSeqNum) + " Expected: " + integrity.peerSeqNum);
     }
+    integrity.incPeerSeqNum();
 
     // return msg considering padding
     if (msgLength == msg.length) {
@@ -179,7 +182,7 @@ public class SparkSaslAES {
     }
 
     byte[] getHMAC(byte[] msg, int start, int len) throws SaslException {
-      seqNum = intToByte(mySeqNum ++);
+      intToByte(mySeqNum);
       return calculateHMAC(myKey, seqNum, msg, start, len);
     }
 
@@ -190,11 +193,19 @@ public class SparkSaslAES {
     }
 
     boolean comparePeerSeqNum(byte[] peerSeqNum) {
-      return this.peerSeqNum ++ == byteToInt(peerSeqNum);
+      return this.peerSeqNum == byteToInt(peerSeqNum);
     }
 
     byte[] getSeqNum() {
       return seqNum;
+    }
+
+    void incMySeqNum() {
+      mySeqNum ++;
+    }
+
+    void incPeerSeqNum() {
+      peerSeqNum ++;
     }
 
     private byte[] calculateHMAC(byte[] key, byte[] seqNum, byte[] msg, int start,
@@ -222,13 +233,11 @@ public class SparkSaslAES {
       }
     }
 
-    private byte[] intToByte(int seqNum) {
-      byte[] answer = new byte[4];
+    private void intToByte(int num) {
       for(int i = 3; i >= 0; i --) {
-        answer[i] = (byte)(seqNum & 0xff);
-        seqNum >>>= 8;
+        seqNum[i] = (byte)(num & 0xff);
+        num >>>= 8;
       }
-      return answer;
     }
 
     private int byteToInt(byte[] seqNum) {

@@ -129,8 +129,10 @@ class SaslRpcHandler extends RpcHandler {
         if (conf.saslEncryptionAesEnabled()) {
           // negotiate AES if configured
           if (isNegotiatingAes) {
+            logger.debug("Negotiating AES for channel");
             negotiateAes(message, callback);
           } else {
+            logger.debug("Waiting for client RPC to negotiate AES for channel");
             isNegotiatingAes = true;
             // return from here to wait for next RPC from client
             return;
@@ -189,21 +191,22 @@ class SaslRpcHandler extends RpcHandler {
     CipherOption cipherOption = CipherOption.decode(Unpooled.wrappedBuffer(message));
     CipherTransformation transformation = CipherTransformation.fromName(cipherOption.cipherSuite);
     Properties properties = new Properties();
-    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
-        JavaSecureRandom.class.getName());
 
     try {
       // generate key and iv
-      int keyLen = conf.saslEncryptionAesCipherKeySizeBits();
-      KeyGenerator keyGenerator = KeyGenerator.getInstance("HmacSHA1");
-      keyGenerator.init(keyLen);
-
-      byte[] inKey = keyGenerator.generateKey().getEncoded();
-      byte[] outKey = keyGenerator.generateKey().getEncoded();
-
+      if (conf.saslEncryptionAesCipherKeySizeBits() % 8 != 0) {
+        throw new IllegalArgumentException("The AES cipher key size in bits should be a multiple " +
+            "of byte");
+      }
+      int keyLen = conf.saslEncryptionAesCipherKeySizeBits() / 8;
+      byte[] inKey = new byte[keyLen];
+      byte[] outKey = new byte[keyLen];
       byte[] inIv = new byte[transformation.getAlgorithmBlockSize()];
       byte[] outIv = new byte[transformation.getAlgorithmBlockSize()];
+
       SecureRandom secureRandom = SecureRandomFactory.getSecureRandom(properties);
+      secureRandom.nextBytes(inKey);
+      secureRandom.nextBytes(outKey);
       secureRandom.nextBytes(inIv);
       secureRandom.nextBytes(outIv);
 
