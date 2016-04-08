@@ -54,6 +54,8 @@ class NettyBlockTransferService(conf: SparkConf, securityManager: SecurityManage
     val rpcHandler = new NettyBlockRpcServer(conf.getAppId, serializer, blockDataManager)
     var serverBootstrap: Option[TransportServerBootstrap] = None
     var clientBootstrap: Option[TransportClientBootstrap] = None
+    logInfo("****** netty block transfer service, aes " + transportConf.saslEncryptionAesEnabled
+      ());
     if (authEnabled) {
       serverBootstrap = Some(new SaslServerBootstrap(transportConf, securityManager))
       clientBootstrap = Some(new SaslClientBootstrap(transportConf, conf.getAppId, securityManager,

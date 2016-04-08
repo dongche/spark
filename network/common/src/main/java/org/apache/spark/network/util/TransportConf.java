@@ -167,15 +167,15 @@ public class TransportConf {
   }
 
   public boolean saslEncryptionAesEnabled() {
-    return conf.getBoolean("spark.network.sasl.encryption.aes.enabled", false);
+    return conf.getBoolean("spark.authenticate.sasl.encryption.aes.enabled", false);
   }
 
   public String saslEncryptionAesCipherTransformation() {
-    return conf.get("spark.network.sasl.encryption.aes.cipher.transformation",
+    return conf.get("spark.authenticate.sasl.encryption.aes.cipher.transformation",
         CipherTransformation.AES_CTR_NOPADDING.getName());
   }
 
   public int saslEncryptionAesCipherKeySizeBits() {
-    return conf.getInt("spark.network.sasl.encryption.aes.cipher.keySizeBits", 128);
+    return conf.getInt("spark.authenticate.sasl.encryption.aes.cipher.keySizeBits", 128);
   }
 }

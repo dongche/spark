@@ -81,7 +81,9 @@ public class ExternalShuffleClient extends ShuffleClient {
     this.appId = appId;
     TransportContext context = new TransportContext(conf, new NoOpRpcHandler(), true);
     List<TransportClientBootstrap> bootstraps = Lists.newArrayList();
+    logger.info("********* External shuffle client init");
     if (saslEnabled) {
+      logger.info("********* External shuffle client init, sasl true");
       bootstraps.add(new SaslClientBootstrap(conf, appId, secretKeyHolder, saslEncryptionEnabled));
     }
     clientFactory = context.createClientFactory(bootstraps);

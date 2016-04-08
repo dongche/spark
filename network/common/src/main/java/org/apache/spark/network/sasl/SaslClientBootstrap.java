@@ -57,7 +57,7 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
       String appId,
       SecretKeyHolder secretKeyHolder,
       boolean encrypt) {
-    logger.info("************* construct client bootstrap {} ********", encrypt);
+    logger.info("xxxxxx: construct client bootstrap, {} ", conf.saslEncryptionAesEnabled());
     this.conf = conf;
     this.appId = appId;
     this.secretKeyHolder = secretKeyHolder;
@@ -87,14 +87,14 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
       }
 
       client.setClientId(appId);
-      logger.info("xxxxxx: client1");
+      logger.info("xxxxxx: client1 encrypt flag {}", encrypt);
       if (encrypt) {
         if (!SparkSaslServer.QOP_AUTH_CONF.equals(saslClient.getNegotiatedProperty(Sasl.QOP))) {
           throw new RuntimeException(
             new SaslException("Encryption requests by negotiated non-encrypted connection."));
         }
 
-        logger.info("xxxxxx: client2");
+        logger.info("xxxxxx: client2 aes flag {}", conf.saslEncryptionAesEnabled());
         if (conf.saslEncryptionAesEnabled()) {
           logger.info("xxxxxx: start aes negotiate on client");
           negotiateAes(client, saslClient);
