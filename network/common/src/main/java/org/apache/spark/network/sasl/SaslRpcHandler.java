@@ -19,13 +19,12 @@ package org.apache.spark.network.sasl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import javax.crypto.KeyGenerator;
 import javax.security.sasl.Sasl;
 
 import com.google.common.base.Throwables;
 import com.intel.chimera.cipher.CipherTransformation;
 import com.intel.chimera.conf.ConfigurationKeys;
-import com.intel.chimera.random.JavaSecureRandom;
+import com.intel.chimera.random.OsSecureRandom;
 import com.intel.chimera.random.SecureRandom;
 import com.intel.chimera.random.SecureRandomFactory;
 import io.netty.buffer.ByteBuf;
@@ -182,24 +181,26 @@ class SaslRpcHandler extends RpcHandler {
   private void negotiateAes(ByteBuffer message, RpcResponseCallback callback) {
     // receive initial option from client
     CipherOption cipherOption = CipherOption.decode(Unpooled.wrappedBuffer(message));
-    logger.info("xxxxxx: cipher in server: {}", cipherOption.cipherSuite);
     CipherTransformation transformation = CipherTransformation.fromName(cipherOption.cipherSuite);
     Properties properties = new Properties();
     properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
-        JavaSecureRandom.class.getName());
+        OsSecureRandom.class.getName());
 
     try {
       // generate key and iv
-      int keyLen = conf.saslEncryptionAesCipherKeySizeBits();
-      KeyGenerator keyGenerator = KeyGenerator.getInstance("HmacSHA1");
-      keyGenerator.init(keyLen);
-
-      byte[] inKey = keyGenerator.generateKey().getEncoded();
-      byte[] outKey = keyGenerator.generateKey().getEncoded();
-
+      if (conf.saslEncryptionAesCipherKeySizeBits() % 8 != 0) {
+        throw new IllegalArgumentException("The AES cipher key size in bits should be a multiple " +
+            "of byte");
+      }
+      int keyLen = conf.saslEncryptionAesCipherKeySizeBits() / 8;
+      byte[] inKey = new byte[keyLen];
+      byte[] outKey = new byte[keyLen];
       byte[] inIv = new byte[transformation.getAlgorithmBlockSize()];
       byte[] outIv = new byte[transformation.getAlgorithmBlockSize()];
+
       SecureRandom secureRandom = SecureRandomFactory.getSecureRandom(properties);
+      secureRandom.nextBytes(inKey);
+      secureRandom.nextBytes(outKey);
       secureRandom.nextBytes(inIv);
       secureRandom.nextBytes(outIv);
 
