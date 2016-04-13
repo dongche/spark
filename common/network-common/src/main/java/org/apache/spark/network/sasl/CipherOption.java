@@ -53,8 +53,8 @@ public class CipherOption implements Encodable {
     return 1 + Encoders.Strings.encodedLength(cipherSuite) + (
         (inKey != null && inIv != null && outKey != null && outIv != null) ?
         Encoders.ByteArrays.encodedLength(inKey) + Encoders.ByteArrays.encodedLength(inKey) +
-            Encoders.ByteArrays.encodedLength(inKey) +Encoders.ByteArrays.encodedLength(inKey) :
-        0);
+        Encoders.ByteArrays.encodedLength(inKey) + Encoders.ByteArrays.encodedLength(inKey)
+        : 0);
   }
 
   @Override

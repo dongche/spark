@@ -19,10 +19,12 @@ package org.apache.spark.network.sasl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 
 import com.intel.chimera.cipher.CipherTransformation;
+import com.intel.chimera.conf.ConfigurationKeys;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -33,8 +35,6 @@ import org.apache.spark.network.client.TransportClient;
 import org.apache.spark.network.client.TransportClientBootstrap;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.TransportConf;
-
-import java.util.Properties;
 
 /**
  * Bootstraps a {@link TransportClient} by performing SASL authentication on the connection. The
@@ -135,6 +135,8 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
 
     // enable AES on saslClient
     Properties properties = new Properties();
+    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
+        conf.saslEncryptionAesCipherClasses());
     saslClient.enableAes(CipherTransformation.fromName(cipherOption.cipherSuite), properties,
         inKey, outKey, cipherOption.outIv, cipherOption.inIv);
 

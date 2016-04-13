@@ -19,13 +19,13 @@ package org.apache.spark.network.sasl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import javax.crypto.KeyGenerator;
+import java.util.Properties;
 import javax.security.sasl.Sasl;
 
 import com.google.common.base.Throwables;
 import com.intel.chimera.cipher.CipherTransformation;
 import com.intel.chimera.conf.ConfigurationKeys;
-import com.intel.chimera.random.JavaSecureRandom;
+import com.intel.chimera.random.OsSecureRandom;
 import com.intel.chimera.random.SecureRandom;
 import com.intel.chimera.random.SecureRandomFactory;
 import io.netty.buffer.ByteBuf;
@@ -40,8 +40,6 @@ import org.apache.spark.network.server.RpcHandler;
 import org.apache.spark.network.server.StreamManager;
 import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.TransportConf;
-
-import java.util.Properties;
 
 /**
  * RPC Handler which performs SASL authentication before delegating to a child RPC handler.
@@ -191,6 +189,10 @@ class SaslRpcHandler extends RpcHandler {
     CipherOption cipherOption = CipherOption.decode(Unpooled.wrappedBuffer(message));
     CipherTransformation transformation = CipherTransformation.fromName(cipherOption.cipherSuite);
     Properties properties = new Properties();
+    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
+        OsSecureRandom.class.getName());
+    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_CIPHER_CLASSES_KEY,
+        conf.saslEncryptionAesCipherClasses());
 
     try {
       // generate key and iv

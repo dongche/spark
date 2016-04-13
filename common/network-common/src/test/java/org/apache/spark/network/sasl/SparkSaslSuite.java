@@ -69,9 +69,9 @@ import org.apache.spark.network.util.TransportConf;
 public class SparkSaslSuite {
 
   private static final String BLOCK_SIZE_CONF = "spark.network.sasl.maxEncryptedBlockSize";
-  private static final String AES_ENABLED_CONF = "spark.network.sasl.encryption.aes.enabled";
+  private static final String AES_ENABLED_CONF = "spark.authenticate.sasl.encryption.aes.enabled";
   private static final String AES_MODE_CONF =
-      "spark.network.sasl.encryption.aes.cipher.transformation";
+      "spark.authenticate.sasl.encryption.aes.cipher.transformation";
 
   /** Provides a secret key holder which returns secret key == appId */
   private SecretKeyHolder secretKeyHolder = new SecretKeyHolder() {
