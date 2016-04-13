@@ -19,6 +19,7 @@ package org.apache.spark.network.util;
 
 import com.google.common.primitives.Ints;
 import com.intel.chimera.cipher.CipherTransformation;
+import com.intel.chimera.cipher.OpensslCipher;
 
 /**
  * A central location that tracks all the settings we expose to users.
@@ -177,5 +178,10 @@ public class TransportConf {
 
   public int saslEncryptionAesCipherKeySizeBits() {
     return conf.getInt("spark.authenticate.sasl.encryption.aes.cipher.keySizeBits", 128);
+  }
+
+  public String saslEncryptionAesCipherClasses() {
+    return conf.get("spark.authenticate.sasl.encryption.aes.cipher.classes",
+        OpensslCipher.class.getName());
   }
 }

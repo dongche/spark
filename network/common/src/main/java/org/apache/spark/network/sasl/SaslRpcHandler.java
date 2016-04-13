@@ -185,6 +185,8 @@ class SaslRpcHandler extends RpcHandler {
     Properties properties = new Properties();
     properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_SECURE_RANDOM_CLASSES_KEY,
         OsSecureRandom.class.getName());
+    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_CIPHER_CLASSES_KEY,
+        conf.saslEncryptionAesCipherClasses());
 
     try {
       // generate key and iv
@@ -198,11 +200,13 @@ class SaslRpcHandler extends RpcHandler {
       byte[] inIv = new byte[transformation.getAlgorithmBlockSize()];
       byte[] outIv = new byte[transformation.getAlgorithmBlockSize()];
 
+      long start = System.currentTimeMillis();
       SecureRandom secureRandom = SecureRandomFactory.getSecureRandom(properties);
       secureRandom.nextBytes(inKey);
       secureRandom.nextBytes(outKey);
       secureRandom.nextBytes(inIv);
       secureRandom.nextBytes(outIv);
+      logger.info("xxxxxx: secure random takes time : {} ", System.currentTimeMillis() - start);
 
       // create new option for client. The key is encrypted
       cipherOption = new CipherOption(cipherOption.cipherSuite,

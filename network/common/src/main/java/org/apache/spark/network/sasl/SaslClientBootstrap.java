@@ -23,6 +23,7 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 
 import com.intel.chimera.cipher.CipherTransformation;
+import com.intel.chimera.conf.ConfigurationKeys;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -141,6 +142,8 @@ public class SaslClientBootstrap implements TransportClientBootstrap {
 
     // enable AES on saslClient
     Properties properties = new Properties();
+    properties.setProperty(ConfigurationKeys.CHIMERA_CRYPTO_CIPHER_CLASSES_KEY,
+        conf.saslEncryptionAesCipherClasses());
     saslClient.enableAes(CipherTransformation.fromName(cipherOption.cipherSuite), properties,
         inKey, outKey, cipherOption.outIv, cipherOption.inIv);
 

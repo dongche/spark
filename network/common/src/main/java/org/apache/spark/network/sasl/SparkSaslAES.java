@@ -47,8 +47,6 @@ public class SparkSaslAES {
 
   private final Integrity integrity;
 
-  private final AtomicInteger count;
-
   public SparkSaslAES(CipherTransformation cipherTransformation, Properties properties, byte[] inKey,
       byte[] outKey, byte[] inIv, byte[] outIv) throws IOException {
     checkTransformation(cipherTransformation);
@@ -69,7 +67,7 @@ public class SparkSaslAES {
     }
 
     integrity = new Integrity(outKey, inKey);
-    count = new AtomicInteger(0);
+    logger.info("xxxxxx : cipher class: {}", encryptor.getClass().getName());
   }
 
   /**
