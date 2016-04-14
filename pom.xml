@@ -1714,6 +1714,12 @@
         <artifactId>antlr-runtime</artifactId>
         <version>${antlr.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.intel.chimera</groupId>
+        <artifactId>chimera</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
