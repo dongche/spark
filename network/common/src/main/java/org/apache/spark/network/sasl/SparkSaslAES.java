@@ -23,6 +23,7 @@ import com.intel.chimera.utils.Utils;
 
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
+import javax.crypto.ShortBufferException;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.sasl.SaslException;
 import java.io.IOException;
@@ -96,11 +97,15 @@ public class SparkSaslAES {
     }
 
     // encrypt
-    byte[] toBeEncrypted = new byte[len + 10 + padding.length];
-    System.arraycopy(data, offset, toBeEncrypted, 0, len);
-    System.arraycopy(padding, 0, toBeEncrypted, len, padding.length);
-    System.arraycopy(mac, 0, toBeEncrypted, len + padding.length, 10);
-    byte[] encrypted = encryptor.update(toBeEncrypted, 0, toBeEncrypted.length);
+    byte[] encrypted = new byte[len + 10 + padding.length];
+    try {
+      int n = encryptor.update(data, offset, len, encrypted, 0);
+      n += encryptor.update(padding, 0, padding.length, encrypted, n);
+      encryptor.update(mac, 0, 10, encrypted, n);
+    } catch (ShortBufferException sbe) {
+      // this should not happen
+      throw new SaslException("Error happens during encrypt data", sbe);
+    }
 
     // append seqNum used for mac
     byte[] wrapped = new byte[encrypted.length + 4];
@@ -122,11 +127,15 @@ public class SparkSaslAES {
    */
   public byte[] unwrap(byte[] data, int offset, int len) throws SaslException {
     // get plaintext and seqNum
-    byte[] encrypted = new byte[len - 4];
+    byte[] decrypted = new byte[len - 4];
     byte[] peerSeqNum = new byte[4];
-    System.arraycopy(data, offset, encrypted, 0, encrypted.length);
-    System.arraycopy(data, offset + encrypted.length, peerSeqNum, 0, 4);
-    byte[] decrypted = decryptor.update(encrypted, 0, encrypted.length);
+    try {
+      decryptor.update(data, offset, len - 4, decrypted, 0);
+    } catch (ShortBufferException sbe) {
+      // this should not happen
+      throw new SaslException("Error happens during decrypt data", sbe);
+    }
+    System.arraycopy(data, offset + decrypted.length, peerSeqNum, 0, 4);
 
     // get msg and mac
     byte[] msg = new byte[decrypted.length - 10];
